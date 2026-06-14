@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  security-events: write # Permite subir reportes de seguridad a la pestaña de Security de GitHub
+  pull-requests: write # Permite subir reportes de seguridad a la pestaña de Security de GitHub
+
 jobs:
 # ── JOB 1: Tests de la aplicación ────────────────────────────────────────
   test:
