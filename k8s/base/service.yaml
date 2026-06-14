@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: crud-backend-svc
+  namespace: dev
+  labels:
+    app: crud-backend # etiqueta para identificar este servicio
+spec:
+  type: ClusterIP
+  selector:
+    app: crud-backend # selecciona los pods con esta etiqueta
+  ports:
+    - name: http
+      port: 80 # puerto del servicio que los clientes usarán para acceder
+      targetPort: 3000 # puerto del contenedor al que se redirigirá el tráfico

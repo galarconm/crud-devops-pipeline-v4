@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crud-backend-deployment
+  namespace: dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: crud-backend # etiqueta para seleccionar los pods que pertenecen a este deployment
+  
+  strategy:
+    type: RollingUpdate # estrategia de actualización continua para evitar downtime
+    rollingUpdate:
+      maxUnavailable: 0 # máximo número de pods que pueden estar no disponibles durante la actualización
+      maxSurge: 1 # máximo número de pods adicionales que pueden ser creados durante la actualización
+  
+  template:
+    metadata:
+      labels:
+        app: crud-backend # etiqueta para identificar los pods de este deployment
+    spec:
+      serviceAccountName: crud-backend # el deployment usará el service account con IRSA
+      
+      securityContext:
+        runAsNonRoot: true # fuerza a que el contenedor no se ejecute como root
+        runAsUser: 1000   # asigna un UID específico para el contenedor
+
+      affinity: # afinidad para distribuir los pods entre nodos
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - crud-backend
+                topologyKey: topology.kubernetes.io/zone # evita que los pods se programen en el mismo AZ
+
+      containers:
+        - name: backend
+          image: 654654193269.dkr.ecr.us-east-1.amazonaws.com/crud-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: crud-backend-config # referencia al ConfigMap para las variables de entorno
+          resources:
+            requests:
+              cpu: "250m"     # 0.25 cores - usado para asignar el pod a un nodo
+              memory: "256Mi" # 256 MiB - garantizado por el scheduler
+            limits:
+              cpu: "500m"     # 0.5 cores -si excede: CPU throttled (lento)
+              memory: "512Mi" # 512 MiB - si excede: OOMKilled (pod reiniciado) (Exit Code 137)
+
+          livenessProbe: # Esta vivo? FALLO -> reiniciar
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 15 # espera antes del primer chequeo
+            periodSeconds: 20       # chequea cada 20 segundos
+            failureThreshold: 3     # reinicia tras 3 fallos consecutivos
+          
+          readinessProbe: # Esta listo para recibir tráfico?  FALLO = SACA de servicio, pero no reinicia
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          startupProbe: # Esta arrancando? FALLO = reiniciar, pero ignora liveness/readiness hasta que pase
+            httpGet:
+              path: /healthz
+              port: 3000
+            failureThreshold: 30
+            periodSeconds: 10

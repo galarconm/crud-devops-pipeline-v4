@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: crud-backend-pdb
+  namespace: dev
+spec:
+  minAvailable: 1 # Siempre al menos 1 pod disponible
+  selector:
+    matchLabels:
+      app: crud-backend # selecciona los pods con esta etiqueta

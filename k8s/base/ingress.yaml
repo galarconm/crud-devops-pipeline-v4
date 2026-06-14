@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crud-backend-ingress
+  namespace: dev
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing # el ALB será accesible desde internet
+    alb.ingress.kubernetes.io/target-type: ip # el ALB enviará tráfico a los pods usando sus IPs
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz # ruta para las verificaciones de salud
+spec:
+  ingressClassName: alb # especifica que este Ingress debe ser manejado por el controlador ALB
+  rules:
+    - http:
+        paths:
+          - path: / # cualquier ruta que comience con / será dirigida al backend
+            pathType: Prefix
+            backend:
+              service:
+                name: crud-backend-svc
+                port: 
+                  name: http
