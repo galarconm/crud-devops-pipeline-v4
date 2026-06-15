@@ -41,7 +41,7 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1 # Si encuentra vulnerabilidades de alta o crítica, falla el job
           trivyignores: .trivyignore
-          format: sarif # Formato SARIF para reportes de seguridad
+          format: table # Formato SARIF para reportes de seguridad
           output: trivy-image-results.sarif
           cache: false
           version: v0.69.3 # Fijamos la versión de Trivy para evitar que cambios futuros rompan el pipeline
