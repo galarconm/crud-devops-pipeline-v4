@@ -44,7 +44,7 @@ jobs:
           format: sarif # Formato SARIF para reportes de seguridad
           output: trivy-image-results.sarif
           cache: false
-          trivy-version: v0.69.3# Fijamos la versión de Trivy para evitar que cambios futuros rompan el pipeline
+          version: v0.69.3 # Fijamos la versión de Trivy para evitar que cambios futuros rompan el pipeline
 
       - name: Push to ECR
         env:
