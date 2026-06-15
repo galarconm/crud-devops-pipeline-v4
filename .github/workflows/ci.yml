@@ -88,8 +88,13 @@ jobs:
             -strict \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -schema-location 'https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/crds/{{.ResourceKind}}.yaml' \
             k8s/base/*.yaml k8s/monitoring/*.yaml k8s/argocd/*.yaml
+
+          kubeconform \
+            -summary \
+            -kubernetes-version "1.29.0" \
+            -ignore-missing-schemas \
+            k8s/argocd/*.yaml  
       
       - name: Install Conftest
         run: |
