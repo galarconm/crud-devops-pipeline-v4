@@ -40,6 +40,7 @@ jobs:
           image-ref: ${{ env.IMAGE }}
           severity: HIGH,CRITICAL
           exit-code: 1 # Si encuentra vulnerabilidades de alta o crítica, falla el job
+          trivyignores: .trivyignore
           format: sarif # Formato SARIF para reportes de seguridad
           output: trivy-image-results.sarif
 
