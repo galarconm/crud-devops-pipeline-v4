@@ -42,7 +42,10 @@ spec:
       containers:
         - name: backend
           image: 654654193269.dkr.ecr.us-east-1.amazonaws.com/crud-backend:latest
-          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          imagePullPolicy: Always  
           ports:
             - containerPort: 3000
               name: http
