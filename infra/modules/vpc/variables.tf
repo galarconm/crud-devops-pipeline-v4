@@ -38,5 +38,5 @@ variable "private_subnet_cidrs" {
 variable "cluster_name" {
   description = "The name of the EKS cluster, used for tagging resources"
   type        = string
-  
+
 }
