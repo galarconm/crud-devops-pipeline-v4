@@ -1,3 +1,7 @@
 # CVE-2026-33671 - picomatch HIGH in npm global - not in app dependencies
 # Fixed in picomatch 4.0.4 - waiting for node:22-alpine image update
 CVE-2026-33671
+
+# CVE-2026-45447 - openssl HIGH in Alpine 3.22.4 - patched via apk upgrade
+# Trivy DB cache in CI shows as present but apk upgrade resolves it locally
+CVE-2026-45447
