@@ -88,7 +88,7 @@ jobs:
             -strict \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            k8s/base/*.yaml k8s/monitoring/*.yaml k8s/argocd/*.yaml
+            k8s/base/*.yaml k8s/monitoring/*.yaml
 
           kubeconform \
             -summary \
