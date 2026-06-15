@@ -21,4 +21,4 @@ COPY --from=builder /app .
 # Copy the built application from the builder stage
 
 CMD [ "npm" , "start" ]
-# Command to run the application when the container starts
+# Command to run the application when the container starts# trigger redeploy
