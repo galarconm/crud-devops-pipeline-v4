@@ -31,3 +31,4 @@ CMD [ "npm" , "start" ]
 # pin trivy binary Mon 15 Jun 2026 04:50:37 PM CEST
 # version param fix Mon 15 Jun 2026 04:52:26 PM CEST
 # debug format Mon 15 Jun 2026 04:54:05 PM CEST
+# fix indentation Mon 15 Jun 2026 05:02:35 PM CEST
