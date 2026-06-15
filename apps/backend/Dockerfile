@@ -26,3 +26,4 @@ CMD [ "npm" , "start" ]
 # Command to run the application when the container starts# trigger redeploy
 # force rebuild Mon 15 Jun 2026 04:36:55 PM CEST
 # rebuild Mon 15 Jun 2026 04:40:50 PM CEST
+# db cache fix Mon 15 Jun 2026 04:45:31 PM CEST
