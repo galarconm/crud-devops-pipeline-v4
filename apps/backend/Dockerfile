@@ -2,7 +2,7 @@
 
 # Stage 1: Build the application
 FROM node:22-alpine3.22 AS builder
-
+RUN apk update && apk upgrade --no-cache
 WORKDIR /app
 #Set the working directory inside the container to /app
 
@@ -17,6 +17,8 @@ COPY . .
 # Stage 2: Production image
 FROM node:22-alpine3.22
 WORKDIR /app
+# Update OS packages to get latest security patches
+RUN apk update && apk upgrade --no-cache
 COPY --from=builder /app .
 # Copy the built application from the builder stage
 
