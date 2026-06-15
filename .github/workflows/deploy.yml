@@ -35,7 +35,7 @@ jobs:
           echo "IMAGE=$ECR_REGISTRY/crud-backend:$IMAGE_TAG" >> $GITHUB_ENV
       
       - name: Trivy - scane de la imagen construida
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.69.3
         with:
           image-ref: ${{ env.IMAGE }}
           severity: HIGH,CRITICAL
@@ -43,6 +43,7 @@ jobs:
           trivyignores: .trivyignore
           format: sarif # Formato SARIF para reportes de seguridad
           output: trivy-image-results.sarif
+          cache: false
 
       - name: Push to ECR
         env:
