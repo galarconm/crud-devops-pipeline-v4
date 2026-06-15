@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crud-backend-config
+  namespace: dev
+data:
+  DB_PORT: "5432"
+  DB_NAME: "crud_db"
+  AWS_REGION: "us-east-1"
+  SECRET_NAME: "crud_pipeline/dev/database" # nombre del secreto en AWS Secrets Manager 
+  PORT: "3000"

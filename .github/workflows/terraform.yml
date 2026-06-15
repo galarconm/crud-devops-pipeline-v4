@@ -1,0 +1,376 @@
+name: Infrastructure - Terraform Pipeline
+
+on:
+  pull_request: # Esto hace que el workflow se ejecute en cada pull request hacia la rama main
+    branches:
+      - main
+    paths: # Esto limita la ejecución del workflow solo a los cambios que afecten a los archivos dentro de las carpetas infra/environments y infra/modules
+      - 'infra/environments/**'
+      - 'infra/modules/**'
+  push: # Esto hace que el workflow se ejecute en cada push hacia la rama main
+    branches:
+      - main
+    paths: # Esto limita la ejecución del workflow solo a los cambios que afecten a los archivos dentro de las carpetas infra/environments y infra/modules
+      - 'infra/environments/**'
+      - 'infra/modules/**'
+env:
+  TF_VERSION: '1.12.2'
+  AWS_REGION: 'us-east-1'
+  TF_VAR_cluster_name: 'crud-devops-pipeline-dev'
+
+permissions:
+    contents: read # Permite al workflow leer el contenido del repositorio, necesario para acciones como checkout
+    issues: write # Permite al workflow crear y gestionar issues, útil para reportar errores o resultados de las acciones
+    pull-requests: write # Permite al workflow gestionar pull requests, necesario para acciones como comentar en PRs o actualizar el estado de las checks
+
+jobs:
+  security-scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Checkov - Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: 'infra/' # Especifica el directorio donde se encuentran tus archivos de Terraform para que Checkov pueda analizarlos
+          framework: 'terraform'
+          soft_fail: true # Esto hace que el paso falle si Checkov encuentra problemas de seguridad, lo que es útil para garantizar que se aborden antes de fusionar el PR
+  
+  fmt-check:
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infra/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format (LINTER)
+        run: terraform fmt -check -recursive
+
+  plan-networking:
+    needs:
+        - security-scan
+        - fmt-check
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/networking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+    
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Validate Syntax
+        run: terraform validate
+        
+
+      - id: plan # Esto asigna un ID a este paso para poder referenciar su salida en pasos posteriores
+        run: terraform plan -no-color # El flag -no-color es importante para evitar caracteres de color en la salida, lo que facilita su manejo en pasos posteriores
+        continue-on-error: true # Esto permite que el workflow continúe incluso si el comando terraform plan falla, lo que es útil para capturar errores de planificación
+
+      - name: Comment Plan Output
+        uses: actions/github-script@v6
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }} # Esto captura la salida del paso de planificación para usarla en el comentario
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: '### networking Plan\n```\n' + process.env.PLAN + '\n```'            })
+
+  plan-data:
+    needs:
+        - security-scan
+        - fmt-check
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/data
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+    
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Validate Syntax
+        run: terraform validate  
+      
+      - id: plan 
+        run: terraform plan -no-color
+        env:
+           TF_VAR_db_password: '${{ secrets.TF_VAR_db_password }}'
+        continue-on-error: true
+
+      - name: Comment Plan Output
+        uses: actions/github-script@v6
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }} # Esto captura la salida del paso de planificación para usarla en el comentario
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: '### data Plan\n```\n' + process.env.PLAN + '\n```'            })
+
+  plan-eks:
+    needs:
+        - security-scan
+        - fmt-check
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/eks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+    
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Validate Syntax
+        run: terraform validate  
+      
+      - id: plan 
+        run: terraform plan -no-color
+        continue-on-error: true
+
+      - name: Comment Plan Output
+        uses: actions/github-script@v6
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }} # Esto captura la salida del paso de planificación para usarla en el comentario
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: '### eks Plan\n```\n' + process.env.PLAN + '\n```'            })            
+  plan-addons:
+    needs:
+        - security-scan
+        - fmt-check
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/addons
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+    
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Validate Syntax
+        run: terraform validate  
+      
+      - id: plan 
+        run: terraform plan -no-color
+        continue-on-error: true
+
+      - name: Comment Plan Output
+        uses: actions/github-script@v6
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }} # Esto captura la salida del paso de planificación para usarla en el comentario
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: '### addons Plan\n```\n' + process.env.PLAN + '\n```'            })             
+
+  apply-networking:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/networking
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+       
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+       
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+       
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Show outputs
+        run: terraform output
+
+  apply-data:
+    needs: apply-networking
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/data
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+       
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+       
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+       
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        env:
+           TF_VAR_db_password: '${{ secrets.TF_VAR_db_password }}'
+
+      - name: Show outputs
+        run: terraform output
+
+  apply-eks:
+    needs: apply-data
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/eks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+       
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+       
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+       
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Show outputs
+        run: terraform output  
+
+  apply-addons:
+    needs: apply-eks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: infra/environments/dev/addons
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+       
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+       
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+       
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.TF_VAR_cluster_name }} --region ${{ env.AWS_REGION }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Show outputs
+        run: terraform output
+

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: crud-backend-servicemonitor
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack # etiqueta para seleccionar este ServiceMonitor con kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - dev # selecciona el namespace donde está el servicio backend
+  selector:
+    matchLabels:
+      app: crud-backend # selecciona el servicio backend usando esta etiqueta
+  endpoints:
+    - port: http # el puerto del servicio backend que queremos monitorear
+      path: /metrics # la ruta donde el backend expone las métricas de Prometheus
+      interval: 15s # frecuencia con la que Prometheus scrapea las métricas
+
+      

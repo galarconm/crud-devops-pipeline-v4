@@ -1,0 +1,22 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: crud-backend-hpa
+  namespace: dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: crud-backend # nombre del deployment al que se aplicará el HPA
+  minReplicas: 2 # Nunca menos de 2 (alta disponibilidad)
+  maxReplicas: 10 # Nunca mas de 10 (control de costos)
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300 # Espera 5 minutos antes bajar pods

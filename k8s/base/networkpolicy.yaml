@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: dev
+spec:
+  podSelector: {} # selecciona todos los pods en el namespace
+  policyTypes:
+    - Ingress # aplica a tráfico entrante
+    - Egress  # aplica a tráfico saliente
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alb-to-backend
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels:
+      app: crud-backend # selecciona los pods del backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 3000 # puerto del servicio backend
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-alb
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels:
+      app: crud-backend # selecciona los pods del backend
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 5432 # PostgreSQL RDS
+        - protocol: TCP
+          port: 443 # HTTPS AWS APIs (para obtener secretos de AWS Secrets Manager)
+        - protocol: TCP
+          port: 53 # DNS
+        - protocol: UDP
+          port: 53 # DNS
+        

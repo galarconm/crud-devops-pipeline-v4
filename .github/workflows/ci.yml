@@ -1,0 +1,107 @@
+name: CI - Test, Scan and Validate
+
+on:
+  push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  security-events: write # Permite subir reportes de seguridad a la pestaña de Security de GitHub
+  pull-requests: write # Permite subir reportes de seguridad a la pestaña de Security de GitHub
+
+jobs:
+# ── JOB 1: Tests de la aplicación ────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+            node-version: '18'
+            cache: 'npm'
+            cache-dependency-path: 'apps/backend/package-lock.json'
+        
+      - name: Install dependencies
+        run: cd apps/backend && npm ci
+    
+      - name: Run tests with coverage
+        run: cd apps/backend && npm test -- --coverage --coverageReporters=json-summary
+
+      - name: Enforce minimum 80% coverage
+        run: |
+          COVERAGE=$(cat apps/backend/coverage/coverage-summary.json \
+          | jq '.total.lines.pct')
+          echo "Line coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "FAIL: Coverage $COVERAGE% is below the 80% minimum threshold"
+            exit 1
+          fi
+          echo "PASS: Coverage $COVERAGE% meets the 80% threshold"
+
+# ── JOB 2: Security scan del codigo fuente ────────────────────────────────────────
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Trivy - scan del filesystem (dependencias y codigo)
+      # Detecta vulnerabilidades en node_modules, Dockerfile, etc.
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: apps/backend
+          severity: HIGH,CRITICAL
+          exit-code: 1 # Si encuentra vulnerabilidades de alta o crítica, falla el job
+          format: sarif # Formato SARIF para reportes de seguridad
+          output: trivy-results.sarif
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() # Siempre se ejecuta, incluso si el paso anterior falla
+        with:
+          sarif_file: trivy-results.sarif
+
+# ── JOB 3: Validacion de manifest de K8s ────────────────────────────────────────
+  validate-manifest:
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz
+          sudo mv kubeconform /usr/local/bin
+      
+      - name: Validate Kubernetes manifests
+        run: |
+          kubeconform \
+            -summary \
+            -kubernetes-version "1.29.0" \
+            -strict \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            k8s/base/*.yaml k8s/monitoring/*.yaml
+
+          kubeconform \
+            -summary \
+            -kubernetes-version "1.29.0" \
+            -ignore-missing-schemas \
+            k8s/argocd/*.yaml  
+      
+      - name: Install Conftest
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.55.0/conftest_0.55.0_Linux_x86_64.tar.gz -o conftest.tar.gz
+          tar xzf conftest.tar.gz
+          sudo mv conftest /usr/local/bin
+      
+      - name: Check security policies with Conftest
+        run: |
+          conftest test k8s/base/*.yaml --policy policies/

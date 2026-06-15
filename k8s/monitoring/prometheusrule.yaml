@@ -1,0 +1,58 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: crud-backend-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack # etiqueta para seleccionar esta regla con kube-prometheus-stack
+spec:
+  groups:
+    - name: crud-backend.golden-signals
+      rules:
+        # Esta regla calcula la tasa de errores HTTP 5xx para el backend y genera una alerta si supera el 5%
+        - record: job:http_error_rate:ratio5m
+          expr: |
+            sum(rate(http_requests_total{status=~"5..",namespace="dev"}[5m]))
+            / sum(rate(http_requests_total{namespace="dev"}[5m]))
+        
+        - alert: HighErrorRate
+          expr: job:http_error_rate:ratio5m > 0.05
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Error rate above 5%"
+            description: "Current: {{ humanizePPercentage $value }}"
+        
+        # Alert: P95 latency above 500ms for 5 minutes
+        - alert: HightLatency
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request)duration_secondes_bucket{namespace="dev"}[5m])) by (le)
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "P95 latency above 500ms"
+
+    - name: crud-backend.kubernetes
+      rules:
+        # Alert: pod restarting too many times - indicates crashes
+        - alert: PodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="dev",container="bakcend"}[15m]) > 3])
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod}} crash looping"
+        
+        # Alert: memory above 85% of limit -OOMKill is imminent
+        - alert: MemoryPressure
+          expr: |
+            container_memory_workin_set_bytes{namesapce="dev",container="backend"} / container_spec_memory_limit_bytes{namespace="dev",container="backend"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Memory usage above 85% of limit for pod {{ $labels.pod }}"

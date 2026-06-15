@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crud-backend
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/galarconm/crud-devops-pipeline-v4
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true  # Si eliminas un archivo de Git, ArgoCD elimina el recurso
+      selfHeal: true # Si alguien hace kubectl apply manual, ArgoCD lo revierte
+  syncOptions:
+    - CreateNamespace=true # Crea el namespace si no existe
+    - ServerSideApply=true # Es para que ArgoCD use Server-Side Apply, lo que mejora la gestión de recursos y evita conflictos con kubectl apply manual
+    

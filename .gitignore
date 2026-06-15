@@ -6,3 +6,4 @@ node_modules/
 .terraform/
 *.log
 *.tfvars
+docs-generators/
