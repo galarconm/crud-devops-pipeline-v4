@@ -28,3 +28,4 @@ CMD [ "npm" , "start" ]
 # rebuild Mon 15 Jun 2026 04:40:50 PM CEST
 # db cache fix Mon 15 Jun 2026 04:45:31 PM CEST
 # pin trivy version Mon 15 Jun 2026 04:49:14 PM CEST
+# pin trivy binary Mon 15 Jun 2026 04:50:37 PM CEST
