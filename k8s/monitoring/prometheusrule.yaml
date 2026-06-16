@@ -22,13 +22,12 @@ spec:
             severity: critical
           annotations:
             summary: "Error rate above 5%"
-            description: "Current: {{ humanizePPercentage $value }}"
+            description: "Current: {{ humanizePercentage $value }}"
         
         # Alert: P95 latency above 500ms for 5 minutes
-        - alert: HightLatency
+        - alert: HighLatency
           expr: |
-            histogram_quantile(0.95, sum(rate(http_request)duration_secondes_bucket{namespace="dev"}[5m])) by (le)
-            ) > 0.5
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="dev"}[5m])) by (le)) > 0.5
           for: 5m
           labels:
             severity: warning
@@ -40,7 +39,7 @@ spec:
         # Alert: pod restarting too many times - indicates crashes
         - alert: PodCrashLooping
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace="dev",container="bakcend"}[15m]) > 3])
+            increase(kube_pod_container_status_restarts_total{namespace="dev",container="backend"}[15m]) > 3
           for: 5m
           labels:
             severity: critical
@@ -50,7 +49,7 @@ spec:
         # Alert: memory above 85% of limit -OOMKill is imminent
         - alert: MemoryPressure
           expr: |
-            container_memory_workin_set_bytes{namesapce="dev",container="backend"} / container_spec_memory_limit_bytes{namespace="dev",container="backend"} > 0.85
+            container_memory_working_set_bytes{namespace="dev",container="backend"} / container_spec_memory_limit_bytes{namespace="dev",container="backend"} > 0.85
           for: 5m
           labels:
             severity: warning

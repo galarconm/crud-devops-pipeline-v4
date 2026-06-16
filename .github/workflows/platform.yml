@@ -1,0 +1,89 @@
+name: Platform -- Helm and Monitoring Manifest
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/monitoring/**' # Cambios en ServiceMonitor, PrometheusRule
+      - 'helm/**' # Cambios en valores de Helm charts
+
+env:
+  AWS_REGION: 'us-east-1'
+  EKS_CLUSTER_NAME: 'crud-devops-pipeline-dev'
+
+jobs:
+  platform-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        run: |
+            aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      
+      - name: Verify cluster is healthy
+        run: |
+          NOTREADY=$(kubectl get nodes --no-headers | grep -v "Ready" | wc -l)
+          if [ "$NOTREADY" -gt 0 ]; then
+            echo "ABORT: Cluster has $NOTREADY unhealthy nodes."
+            kubectl get nodes
+            exit 1
+          fi
+          echo " Cluster healty - proceeding" 
+          
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+          
+      - name: Add Helm repos
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update 
+
+      - name: Install helm-diff plugin
+        run: |
+          helm plugin install https://github.com/databus23/helm-diff
+         
+      - name: Show what will change in Prometheus (helm diff)
+        run: |
+          helm diff upgrade kube-prometheus-stack \
+            prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            -f helm/prometheus-values.yaml || true
+            # || true: helm diff devuelve exit code 1 si hay cambios (correcto)
+    
+      - name: Update Prometheus stack
+        run: |
+          helm upgrade --install kube-prometheus-stack \
+            prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --atomic \
+            --timeout 5m \
+            -f helm/prometheus-values.yaml
+        # --atomic: si falla, revierte cambios (rollback)
+        # --timeout 5m: espera hasta 5 minutos para que los pods estén listos
+
+      - name: Apply monitoring manifests
+        run: |
+           kubectl apply -f k8s/monitoring/
+    
+      - name: Verify Prometheus is healthy after update
+        run: |
+            kubectl rollout status deployment/kube-prometheus-stack-grafana \
+                -n monitoring --timeout=3m
+            kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus \
+                -n monitoring --timeout=5m
+            echo "Platform update completed successfully."

@@ -10,6 +10,7 @@ spec:
   source:
     repoURL: https://github.com/galarconm/crud-devops-pipeline-v4
     targetRevision: main
+    path: k8s/base # ArgoCD sincroniza esta carpeta
   destination:
     server: https://kubernetes.default.svc
     namespace: dev
