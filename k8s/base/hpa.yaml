@@ -7,7 +7,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: crud-backend # nombre del deployment al que se aplicará el HPA
+    name: crud-backend-deployment # nombre del deployment al que se aplicará el HPA
   minReplicas: 2 # Nunca menos de 2 (alta disponibilidad)
   maxReplicas: 10 # Nunca mas de 10 (control de costos)
   metrics:
