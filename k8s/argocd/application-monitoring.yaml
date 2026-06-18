@@ -16,6 +16,6 @@ spec:
     automated:
       prune: true  # Si eliminas un archivo de Git, ArgoCD elimina el recurso
       selfHeal: true # Si alguien hace kubectl apply manual, ArgoCD lo revierte
-  syncOptions:
-    - CreateNamespace=true # Crea el namespace si no existe
-    - ServerSideApply=true # Es para que ArgoCD use Server-Side Apply,
+    syncOptions:
+      - CreateNamespace=true # Crea el namespace si no existe
+      - ServerSideApply=true # Es para que ArgoCD use Server-Side Apply,
