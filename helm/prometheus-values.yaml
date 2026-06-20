@@ -8,3 +8,4 @@ grafana:
 # retrigger after helm version fix
 # retrigger after helm-diff version pin
 # retrigger after alertmanager-config fix
+# trigger platform Sat 20 Jun 2026 07:11:37 PM CEST
