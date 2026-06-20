@@ -1,0 +1,48 @@
+name: Teardown - Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.12.2'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy addons
+        run: |
+          cd infra/environments/dev/addons
+          terraform init -input=false
+          terraform destroy -auto-approve
+
+      - name: Destroy EKS
+        run: |
+          cd infra/environments/dev/eks
+          terraform init -input=false
+          terraform destroy -auto-approve
+
+      - name: Destroy data
+        run: |
+          cd infra/environments/dev/data
+          terraform init -input=false
+          terraform destroy -auto-approve -var="db_password=${{ secrets.TF_VAR_db_password }}"
+
+      - name: Destroy networking
+        run: |
+          cd infra/environments/dev/networking
+          terraform init -input=false
+          terraform destroy -auto-approve

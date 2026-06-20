@@ -1,0 +1,47 @@
+name: Teardown - Remove ArgoCD and Load Balancer Controller
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: 'us-east-1'
+  EKS_CLUSTER_NAME: 'crud-devops-pipeline-dev'
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Delete ArgoCD Applications
+        run: |
+          kubectl delete -f k8s/argocd/application-backend.yaml --ignore-not-found
+          kubectl delete -f k8s/argocd/application-monitoring.yaml --ignore-not-found
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.15.0
+
+      - name: Uninstall Prometheus stack
+        run: helm uninstall kube-prometheus-stack -n monitoring || true
+
+      - name: Uninstall Load Balancer Controller
+        run: helm uninstall aws-load-balancer-controller -n kube-system || true
+
+      - name: Wait for ALB cleanup
+        run: |
+          echo "Esperando que el ALB se elimine..."
+          sleep 90
+          aws elbv2 describe-load-balancers --region ${{ env.AWS_REGION }} \
+            --query 'LoadBalancers[*].[LoadBalancerName,State.Code]' --output table
