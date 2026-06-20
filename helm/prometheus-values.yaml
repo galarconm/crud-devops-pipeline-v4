@@ -6,3 +6,4 @@ grafana:
   adminPassword: admin123   # mismo valor que el --set del capítulo 10
 # trigger platform pipeline
 # retrigger after helm version fix
+# retrigger after helm-diff version pin
