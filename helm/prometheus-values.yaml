@@ -7,3 +7,4 @@ grafana:
 # trigger platform pipeline
 # retrigger after helm version fix
 # retrigger after helm-diff version pin
+# retrigger after alertmanager-config fix
