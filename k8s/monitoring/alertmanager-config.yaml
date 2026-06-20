@@ -16,22 +16,22 @@ spec:
             value: critical
         receiver: pagerduty-critical
 
-inhibitRules:
-  - sourceMatch:
-      - name: alertname
-        value: PodCrashLooping
-    targetMatch:
-      - name: alertname
-        value: HighLatency
-    equal: ['namespace']
+  inhibitRules:
+    - sourceMatch:
+        - name: alertname
+          value: PodCrashLooping
+      targetMatch:
+        - name: alertname
+          value: HighLatency
+      equal: ['namespace']
 
-receivers:
-  - name: slack-warnings
-    slackConfigs:
-      - channel: '#alerts-dev'
-        apiURL:
-          name: slack-webhook-secret
-          key: webhook-url
-  - name: pagerduty-critical
-    pagerdutyConfigs:
-      - routingKey: YOUR-PAGERDUTY-KEY
+  receivers:
+    - name: slack-warnings
+      slackConfigs:
+        - channel: '#alerts-dev'
+          apiURL:
+            name: slack-webhook-secret
+            key: webhook-url
+    - name: pagerduty-critical
+      pagerdutyConfigs:
+        - routingKey: YOUR-PAGERDUTY-KEY
