@@ -4,3 +4,4 @@ prometheus:
 
 grafana:
   adminPassword: admin123   # mismo valor que el --set del capítulo 10
+# trigger platform pipeline
