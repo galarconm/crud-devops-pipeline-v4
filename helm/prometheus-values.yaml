@@ -20,8 +20,13 @@ alertmanager:
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
-      receiver: "slack-alertas"
+      receiver: "null"
+      routes:
+        - matchers:
+            - alertname="Watchdog"
+          receiver: "null"
     receivers:
+      - name: "null"    
       - name: "slack-alertas"
         slack_configs:
           - api_url: "SLACK_WEBHOOK_PLACEHOLDER"
