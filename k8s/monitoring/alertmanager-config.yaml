@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: crud-backend-routing
+  namespace: monitoring
+spec:
+  route:
+    groupBy: ['alertname', 'namespace']
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 12h
+    receiver: 'slack-alertas'
+  inhibitRules:
+    - sourceMatch:
+        - name: alertname
+          value: PodCrashLooping
+      targetMatch:
+        - name: alertname
+          value: HighLatency
+      equal: ['namespace']
+  receivers:
+    - name: slack-alertas
+      slackConfigs:
+        - channel: '#alertas'
+          apiURL:
+            name: slack-webhook-secret
+            key: webhook-url
+          sendResolved: true
+          title: '{{ .Status | toUpper }} {{ .CommonLabels.alertname }}'
+          text: |
+            {{ range .Alerts }}
+            *Descripcion:* {{ .Annotations.summary }}
+            *Namespace:* {{ .Labels.namespace }}
+            *Severidad:* {{ .Labels.severity }}
+            {{ end }}
