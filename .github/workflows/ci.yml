@@ -99,7 +99,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: always() # Siempre se ejecuta, incluso si el paso anterior falla
         with:
-          #sarif_file: trivy-results.sarif
+          sarif_file: trivy-results.sarif
 
 # ── JOB 3: Validacion de manifest de K8s ────────────────────────────────────────
   validate-manifest:
