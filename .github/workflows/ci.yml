@@ -83,6 +83,7 @@ jobs:
           output: trivy-results.sarif
           version: v0.69.3
           cache: false # Desactiva cache para evitar falsos positivos en CI
+          trivyignores: .trivyignore # Ignora vulnerabilidades conocidas y aceptadas
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
