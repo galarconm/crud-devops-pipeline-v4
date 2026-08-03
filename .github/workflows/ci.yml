@@ -12,6 +12,25 @@ permissions:
   pull-requests: write # Permite subir reportes de seguridad a la pestaña de Security de GitHub
 
 jobs:
+# ── JOB 0: Análisis estático del código ────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+            node-version: '18'
+            cache: 'npm'
+            cache-dependency-path: 'apps/backend/package-lock.json'
+
+      - name: Install dependencies
+        run: cd apps/backend && npm ci
+
+      - name: Run ESLint
+        run: cd apps/backend && npm run lint
 # ── JOB 1: Tests de la aplicación ────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
@@ -46,7 +65,9 @@ jobs:
 # ── JOB 2: Security scan del codigo fuente ────────────────────────────────────────
   security-scan:
     runs-on: ubuntu-latest
-    needs: test
+    needs: 
+      - lint
+      - test
     steps:
       - uses: actions/checkout@v3
 
@@ -60,6 +81,8 @@ jobs:
           exit-code: 1 # Si encuentra vulnerabilidades de alta o crítica, falla el job
           format: sarif # Formato SARIF para reportes de seguridad
           output: trivy-results.sarif
+          version: v0.69.3
+          cache: false # Desactiva cache para evitar falsos positivos en CI
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -70,7 +93,9 @@ jobs:
 # ── JOB 3: Validacion de manifest de K8s ────────────────────────────────────────
   validate-manifest:
     runs-on: ubuntu-latest
-    needs: security-scan
+    needs: 
+      - lint
+      - test
     steps:
       - uses: actions/checkout@v3
 
