@@ -71,6 +71,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+            node-version: '18'
+            cache: 'npm'
+            cache-dependency-path: 'apps/backend/package-lock.json'
+
+      - name: Install dependencies
+        run: cd apps/backend && npm ci --omit=dev
+
       - name: Trivy - scan del filesystem (dependencias y codigo)
       # Detecta vulnerabilidades en node_modules, Dockerfile, etc.
         uses: aquasecurity/trivy-action@master
