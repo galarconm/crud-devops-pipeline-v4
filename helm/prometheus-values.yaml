@@ -4,6 +4,36 @@ prometheus:
 
 grafana:
   adminPassword: admin123   # mismo valor que el --set del capítulo 10
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+      isDefault: false
+
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: "slack-alertas"
+    receivers:
+      - name: "slack-alertas"
+        slack_configs:
+          - api_url: "SLACK_WEBHOOK_PLACEHOLDER"
+            channel: "#alertas"
+            send_resolved: true
+            title: "{{ .Status | toUpper }} {{ .CommonLabels.alertname }}"
+            text: |
+              {{ range .Alerts }}
+              *Descripcion:* {{ .Annotations.summary }}
+              *Namespace:* {{ .Labels.namespace }}
+              *Severidad:* {{ .Labels.severity }}
+              {{ end }}
 # trigger platform pipeline
 # retrigger after helm version fix
 # retrigger after helm-diff version pin

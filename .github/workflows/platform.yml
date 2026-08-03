@@ -63,7 +63,15 @@ jobs:
             --namespace monitoring \
             -f helm/prometheus-values.yaml || true
             # || true: helm diff devuelve exit code 1 si hay cambios (correcto)
-    
+
+      - name: Inject Slack webhook into values   # ← NUEVO
+        run: |
+          sed -i "s|SLACK_WEBHOOK_PLACEHOLDER|${{ secrets.SLACK_WEBHOOK_URL }}|g" \
+            helm/prometheus-values.yaml
+        # Reemplaza el placeholder con el secret real en memoria
+        # La URL nunca queda expuesta en el repo
+            
+
       - name: Update Prometheus stack
         run: |
           helm upgrade --install kube-prometheus-stack \
@@ -75,6 +83,20 @@ jobs:
             -f helm/prometheus-values.yaml
         # --atomic: si falla, revierte cambios (rollback)
         # --timeout 5m: espera hasta 5 minutos para que los pods estén listos
+
+      - name: Install Loki stack                  # ← NUEVO
+        run: |
+          helm upgrade --install loki grafana/loki-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --set grafana.enabled=false \
+            --set prometheus.enabled=false \
+            --set loki.persistence.enabled=false \
+            --atomic \
+            --timeout 5m
+          # grafana.enabled=false — ya tenemos Grafana del kube-prometheus-stack
+          # prometheus.enabled=false — ya tenemos Prometheus
+          # loki.persistence.enabled=false — sin PVC para el lab
 
       - name: Apply monitoring manifests
         run: |
