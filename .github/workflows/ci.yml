@@ -81,6 +81,15 @@ jobs:
       - name: Install dependencies
         run: cd apps/backend && npm ci --omit=dev
 
+      - name: Debug - show trivy findings
+        run: |
+          trivy fs apps/backend \
+            --severity HIGH,CRITICAL \
+            --ignorefile .trivyignore \
+            --format table \
+            --exit-code 0
+        continue-on-error: true
+
       - name: Trivy - scan del filesystem (dependencias y codigo)
       # Detecta vulnerabilidades en node_modules, Dockerfile, etc.
         uses: aquasecurity/trivy-action@master
