@@ -54,8 +54,8 @@ spec:
                 name: crud-backend-config # referencia al ConfigMap para las variables de entorno
           resources:
             requests:
-              cpu: "250m"     # 0.25 cores - usado para asignar el pod a un nodo
-              memory: "256Mi" # 256 MiB - garantizado por el scheduler
+              cpu: "250m"     # 0.25 cores - usado para asignar el pod a un nodo x2 o x5
+              memory: "256Mi" # 256 MiB - garantizado por el scheduler x1.5 0 x2
             limits:
               cpu: "500m"     # 0.5 cores -si excede: CPU throttled (lento)
               memory: "512Mi" # 512 MiB - si excede: OOMKilled (pod reiniciado) (Exit Code 137)

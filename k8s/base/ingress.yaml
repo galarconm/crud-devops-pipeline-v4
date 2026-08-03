@@ -19,3 +19,7 @@ spec:
                 name: crud-backend-svc
                 port: 
                   name: http
+# que hace este ingress
+# Este Ingress configura un Application Load Balancer (ALB) en AWS para dirigir el tráfico HTTP entrante
+# hacia el servicio `crud-backend-svc` en el namespace `dev`.
+          
