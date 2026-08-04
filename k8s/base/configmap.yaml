@@ -7,5 +7,5 @@ data:
   DB_PORT: "5432"
   DB_NAME: "crud_db"
   AWS_REGION: "us-east-1"
-  SECRET_NAME: "secret-que-no-existe" #"crud_pipeline/dev/database" # nombre del secreto en AWS Secrets Manager 
+  SECRET_NAME: "crud_pipeline/dev/database" # nombre del secreto en AWS Secrets Manager 
   PORT: "3000"
