@@ -55,10 +55,10 @@ spec:
           resources:
             requests:
               cpu: "250m"     # 0.25 cores - usado para asignar el pod a un nodo x2 o x5
-              memory: "64Mi" # 256 MiB - garantizado por el scheduler x1.5 0 x2
+              memory: "20Mi" # 256 MiB - garantizado por el scheduler x1.5 0 x2
             limits:
               cpu: "500m"     # 0.5 cores -si excede: CPU throttled (lento)
-              memory: "80Mi" # 512 MiB - si excede: OOMKilled (pod reiniciado) (Exit Code 137)
+              memory: "30Mi" # 512 MiB - si excede: OOMKilled (pod reiniciado) (Exit Code 137)
 
           livenessProbe: # Esta vivo? FALLO -> reiniciar
             httpGet:
