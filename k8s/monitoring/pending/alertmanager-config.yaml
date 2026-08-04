@@ -9,13 +9,7 @@ spec:
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 12h
-    receiver: 'slack-warnings'
-    routes:
-      - matchers:
-          - name: severity
-            value: critical
-        receiver: pagerduty-critical
-
+    receiver: 'slack-alertas'
   inhibitRules:
     - sourceMatch:
         - name: alertname
@@ -24,14 +18,18 @@ spec:
         - name: alertname
           value: HighLatency
       equal: ['namespace']
-
   receivers:
-    - name: slack-warnings
+    - name: slack-alertas
       slackConfigs:
-        - channel: '#alerts-dev'
+        - channel: '#alertas'
           apiURL:
             name: slack-webhook-secret
             key: webhook-url
-    - name: pagerduty-critical
-      pagerdutyConfigs:
-        - routingKey: YOUR-PAGERDUTY-KEY
+          sendResolved: true
+          title: '{{ .Status | toUpper }} {{ .CommonLabels.alertname }}'
+          text: |
+            {{ range .Alerts }}
+            *Descripcion:* {{ .Annotations.summary }}
+            *Namespace:* {{ .Labels.namespace }}
+            *Severidad:* {{ .Labels.severity }}
+            {{ end }}
