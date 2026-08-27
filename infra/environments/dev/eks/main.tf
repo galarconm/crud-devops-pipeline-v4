@@ -62,18 +62,18 @@ locals {
 module "eks" {
   source = "../../../modules/eks"
 
-  project_name       = local.name
-  environment        = local.environment
-  vpc_id             = data.terraform_remote_state.networking.outputs.vpc_id
-  private_subnet_id  = data.terraform_remote_state.networking.outputs.private_subnet_ids
-  public_subnet_id   = data.terraform_remote_state.networking.outputs.public_subnet_ids
-  cluster_version    = "1.35"
-  node_instance_type = "t3.medium"
-  node_min_size      = 1
-  node_max_size      = 3
-  node_desired_size  = 2
-  cluster_sg_id      = data.terraform_remote_state.networking.outputs.eks_cluster_sg_id
-
+  project_name          = local.name
+  environment           = local.environment
+  vpc_id                = data.terraform_remote_state.networking.outputs.vpc_id
+  middleware_subnet_ids = data.terraform_remote_state.networking.outputs.middleware_subnet_ids
+  ekswork_subnet_ids    = data.terraform_remote_state.networking.outputs.ekswork_subnet_ids
+  cluster_version       = "1.35"
+  node_instance_type    = "t3.medium"
+  node_min_size         = 1
+  node_max_size         = 3
+  node_desired_size     = 2
+  cluster_sg_id         = data.terraform_remote_state.networking.outputs.eks_cluster_sg_id
+  node_sg_id            = data.terraform_remote_state.networking.outputs.eks_nodes_sg_id
 }
 
 module "iam" {

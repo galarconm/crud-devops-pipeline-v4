@@ -16,13 +16,14 @@ variable "vpc_id" {
 
 }
 
-variable "private_subnet_id" {
-  description = "The IDs of the private subnets for the EKS cluster."
+variable "middleware_subnet_ids" {
+  description = "donde EKS crea las ENIs del control plane"
   type        = list(string)
+
 }
 
-variable "public_subnet_id" {
-  description = "The IDs of the public subnets for the EKS cluster."
+variable "ekswork_subnet_ids" {
+  description = "The IDs of the subnets for the EKS worker nodes."
   type        = list(string)
 
 }
@@ -38,14 +39,7 @@ variable "node_instance_type" {
   description = "The instance type for the EKS worker nodes."
   type        = string
   default     = "t3.medium"
-
 }
-
-# variable "node_ami_type" {
-#   description = "The AMI family to use for the EKS managed node group."
-#   type        = string
-#   default     = "AL2_x86_64"
-# }
 
 variable "node_min_size" {
   type        = number
@@ -70,4 +64,9 @@ variable "cluster_sg_id" {
   type        = string
   description = "The ID of the security group for the EKS cluster control plane."
 
+}
+
+variable "node_sg_id" {
+  type        = string
+  description = "The ID of the security group for EKS worker nodes."
 }

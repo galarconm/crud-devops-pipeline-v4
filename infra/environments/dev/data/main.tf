@@ -56,7 +56,7 @@ module "rds" {
 
   project_name      = local.name
   environment       = local.environment
-  subnets_ids       = data.terraform_remote_state.networking.outputs.private_subnet_ids
+  subnets_ids       = data.terraform_remote_state.networking.outputs.data_subnet_ids
   security_group_id = data.terraform_remote_state.networking.outputs.rds_sg_id
   db_username       = "crudadmin"
   db_password       = var.db_password

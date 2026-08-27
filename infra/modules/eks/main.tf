@@ -54,10 +54,10 @@ resource "aws_eks_cluster" "main" {
   version  = var.cluster_version
   role_arn = aws_iam_role.cluster.arn
   vpc_config {
-    subnet_ids              = concat(var.private_subnet_id, var.public_subnet_id)
+    subnet_ids              = var.middleware_subnet_ids
     security_group_ids      = [var.cluster_sg_id]
     endpoint_private_access = true
-    endpoint_public_access  = true
+    endpoint_public_access  = false
   }
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
@@ -83,7 +83,13 @@ resource "aws_eks_node_group" "main" {
   node_group_name = "${local.name}-node-group"
   node_role_arn   = aws_iam_role.nodes.arn
 
-  subnet_ids = var.private_subnet_id
+  ami_type = "CUSTOM"
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = aws_launch_template.nodes.latest_version
+  }
+
+  subnet_ids = var.ekswork_subnet_ids
 
   scaling_config {
     desired_size = var.node_desired_size
@@ -101,4 +107,30 @@ resource "aws_eks_node_group" "main" {
 
   depends_on = [aws_iam_role_policy_attachment.node_policy]
 
+}
+
+resource "aws_launch_template" "nodes" {
+  name_prefix            = "${local.name}-eks-node"
+  image_id               = data.aws_ssm_parameter.eks_ami.value
+  user_data              = local.node_userdata
+  vpc_security_group_ids = [var.node_sg_id]
+}
+
+data "aws_ssm_parameter" "eks_ami" {
+  name = "/aws/service/eks/optimized-ami/${var.cluster_version}/amazon-linux-2023/x86_64/standard/recommended/image_id"
+}
+
+locals {
+  node_userdata = base64encode(yamlencode({
+    apiVersion = "node.eks.aws/v1alpha1"
+    kind       = "NodeConfig"
+    spec = {
+      cluster = {
+        name                 = aws_eks_cluster.main.name
+        apiServerEndpoint    = aws_eks_cluster.main.endpoint
+        certificateAuthority = aws_eks_cluster.main.certificate_authority[0].data
+        cidr                 = aws_eks_cluster.main.kubernetes_network_config[0].service_ipv4_cidr
+      }
+    }
+  }))
 }
