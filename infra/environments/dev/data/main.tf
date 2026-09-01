@@ -76,3 +76,13 @@ module "secrets" {
   db_name      = "cruddb"
 
 }
+
+module "efs" {
+  source = "../../../modules/efs"
+
+  project_name    = local.name
+  environment     = local.environment
+  vpc_id          = data.terraform_remote_state.networking.outputs.vpc_id
+  data_subnet_ids = data.terraform_remote_state.networking.outputs.data_subnet_ids
+  eks_nodes_sg_id = data.terraform_remote_state.networking.outputs.eks_nodes_sg_id
+}
