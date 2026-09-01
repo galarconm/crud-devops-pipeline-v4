@@ -75,6 +75,7 @@ module "eks_addons" {
   cluster_name      = data.terraform_remote_state.eks.outputs.cluster_name
   oidc_provider_arn = data.terraform_remote_state.eks.outputs.oidc_provider_arn
   oidc_provider_url = data.terraform_remote_state.eks.outputs.oidc_provider_url
+  vpc_id            = data.terraform_remote_state.networking.outputs.vpc_id
 }
 
 locals {
