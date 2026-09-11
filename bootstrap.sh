@@ -59,7 +59,7 @@ VPC_ID=$(cd "$REPO_DIR/infra/environments/dev/networking" && terraform init -inp
 echo "LBC_ROLE_ARN=$LBC_ROLE_ARN"
 echo "VPC_ID=$VPC_ID"
 
-helm install aws-load-balancer-controller \
+helm upgrade --install aws-load-balancer-controller \
   eks/aws-load-balancer-controller \
   --namespace kube-system \
   --set clusterName="$EKS_CLUSTER_NAME" \
@@ -87,9 +87,10 @@ echo "EXTERNAL_DNS_DOMAIN=$EXTERNAL_DNS_DOMAIN"
 
 kubectl create namespace external-dns || true
 
-helm install external-dns external-dns/external-dns \
+helm upgrade --install external-dns external-dns/external-dns \
   --namespace external-dns \
   --set provider=aws \
+  --set policy=sync \
   --set aws.zoneType=private \
   --set "domainFilters[0]=$EXTERNAL_DNS_DOMAIN" \
   --set "aws.zoneIds[0]=$EXTERNAL_DNS_ZONE_ID" \
@@ -105,7 +106,7 @@ echo "Installing cert-manager..."
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
 
-helm install cert-manager jetstack/cert-manager \
+helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
   --set installCRDs=true
