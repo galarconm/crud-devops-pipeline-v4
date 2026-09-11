@@ -70,6 +70,14 @@ helm upgrade --install aws-load-balancer-controller \
   --set vpcId="$VPC_ID"
 
 kubectl wait --for=condition=available --timeout=5m deployment/aws-load-balancer-controller -n kube-system
+
+# `helm upgrade` regenerates the webhook's self-signed cert every run, but
+# won't restart pods that don't otherwise need it - leaving them serving a
+# stale cert that no longer matches the webhook's registered CA bundle.
+# That breaks creation of ANY Service/Pod cluster-wide until they restart.
+echo "Restarting AWS Load Balancer Controller to pick up its webhook certificate..."
+kubectl rollout restart deployment/aws-load-balancer-controller -n kube-system
+kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=5m
 kubectl get pods -n kube-system | grep aws-load-balancer-controller
 
 echo "Installing ExternalDNS..."
