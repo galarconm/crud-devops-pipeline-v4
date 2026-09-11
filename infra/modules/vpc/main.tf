@@ -245,3 +245,23 @@ resource "aws_route_table_association" "ekspods" {
   route_table_id = aws_route_table.eks[count.index].id
 
 }
+
+resource "aws_route_table" "egress" {
+  vpc_id = aws_vpc.crud_devops_pipeline_vpc.id
+
+  tags = {
+    Name        = "${local.project_name}-egress-route-table"
+    Environment = var.environment
+  }
+}
+
+resource "aws_route" "egress_default" {
+  route_table_id         = aws_route_table.egress.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id              = aws_internet_gateway.crud_devops_pipeline_igw.id
+}
+
+resource "aws_route_table_association" "egress" {
+  subnet_id      = aws_subnet.egress.id
+  route_table_id = aws_route_table.egress.id
+}

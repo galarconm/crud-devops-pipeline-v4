@@ -27,7 +27,7 @@ jobs:
 
       - name: Verify cluster is healthy
         run: |
-          NOTREADY=$(kubectl get nodes --no-headers | grep -v "Ready" | wc -l)
+          NOTREADY=$(kubectl get nodes --no-headers | grep -v " Ready" | wc -l)
           if [ "$NOTREADY" -gt 0 ]; then
             echo "ABORT: Cluster has $NOTREADY unhealthy nodes."
             kubectl get nodes
@@ -59,10 +59,7 @@ jobs:
           helm repo add eks https://aws.github.io/eks-charts
           helm repo update
           LBC_ROLE_ARN=$(cd infra/environments/dev/addons && terraform init -input=false > /dev/null && terraform output -raw lbc_role_arn)
-          VPC_ID=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=*${{ env.EKS_CLUSTER_NAME }}*" \
-            --region ${{ env.AWS_REGION }} \
-            --query 'Vpcs[0].VpcId' --output text)
+          VPC_ID=$(cd infra/environments/dev/networking && terraform init -input=false > /dev/null && terraform output -raw vpc_id)
 
           echo "LBC_ROLE_ARN=$LBC_ROLE_ARN"
           echo "VPC_ID=$VPC_ID"
