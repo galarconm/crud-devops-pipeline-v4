@@ -33,7 +33,7 @@ echo "Configuring kubectl for cluster $EKS_CLUSTER_NAME..."
 aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
 
 echo "Verifying cluster is healthy..."
-NOTREADY=$(kubectl get nodes --no-headers | grep -v " Ready" | wc -l)
+NOTREADY=$(kubectl get nodes --no-headers | awk '$2 != "Ready"' | wc -l)
 if [ "$NOTREADY" -gt 0 ]; then
   echo "ABORT: Cluster has $NOTREADY unhealthy nodes."
   kubectl get nodes
