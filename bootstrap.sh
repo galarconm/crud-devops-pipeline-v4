@@ -72,6 +72,63 @@ helm install aws-load-balancer-controller \
 kubectl wait --for=condition=available --timeout=5m deployment/aws-load-balancer-controller -n kube-system
 kubectl get pods -n kube-system | grep aws-load-balancer-controller
 
+echo "Installing ExternalDNS..."
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+helm repo update
+
+EXTERNAL_DNS_ROLE_ARN=$(cd "$REPO_DIR/infra/environments/dev/addons" && terraform init -input=false > /dev/null && terraform output -raw external_dns_role_arn)
+EXTERNAL_DNS_ZONE_ID=$(cd "$REPO_DIR/infra/environments/dev/addons" && terraform output -raw external_dns_zone_id)
+EXTERNAL_DNS_DOMAIN=$(cd "$REPO_DIR/infra/environments/dev/addons" && terraform output -raw external_dns_zone_name)
+EXTERNAL_DNS_DOMAIN="${EXTERNAL_DNS_DOMAIN%.}" # Route53 zone names end in a trailing dot, domainFilters doesn't want it
+
+echo "EXTERNAL_DNS_ROLE_ARN=$EXTERNAL_DNS_ROLE_ARN"
+echo "EXTERNAL_DNS_ZONE_ID=$EXTERNAL_DNS_ZONE_ID"
+echo "EXTERNAL_DNS_DOMAIN=$EXTERNAL_DNS_DOMAIN"
+
+kubectl create namespace external-dns || true
+
+helm install external-dns external-dns/external-dns \
+  --namespace external-dns \
+  --set provider=aws \
+  --set aws.zoneType=private \
+  --set "domainFilters[0]=$EXTERNAL_DNS_DOMAIN" \
+  --set "aws.zoneIds[0]=$EXTERNAL_DNS_ZONE_ID" \
+  --set txtOwnerId="$EKS_CLUSTER_NAME" \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=external-dns \
+  --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$EXTERNAL_DNS_ROLE_ARN"
+
+kubectl wait --for=condition=available --timeout=5m deployment/external-dns -n external-dns
+kubectl get pods -n external-dns
+
+echo "Installing cert-manager..."
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set installCRDs=true
+
+kubectl wait --for=condition=available --timeout=5m deployment/cert-manager -n cert-manager
+kubectl wait --for=condition=available --timeout=5m deployment/cert-manager-webhook -n cert-manager
+
+# No real public domain to validate a DNS-01/ACME challenge against (the
+# Route53 zone above is private), so a self-signed ClusterIssuer is the
+# practical choice here instead of Let's Encrypt.
+echo "Creating self-signed ClusterIssuer..."
+cat <<'EOF' | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+EOF
+
+kubectl get clusterissuer
+kubectl get pods -n cert-manager
+
 echo "Applying ArgoCD application manifests..."
 kubectl apply -f "$REPO_DIR/k8s/argocd/"
 

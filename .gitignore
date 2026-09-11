@@ -10,3 +10,4 @@ docs-generators/
 destroy.sh
 run.sh
 deploy.txt
+generated/
