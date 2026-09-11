@@ -4,7 +4,7 @@ metadata:
   name: crud-backend-ingress
   namespace: dev
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing # el ALB será accesible desde internet
+    alb.ingress.kubernetes.io/scheme: internal # el ALB solo es accesible desde dentro de la VPC/intranet
     alb.ingress.kubernetes.io/target-type: ip # el ALB enviará tráfico a los pods usando sus IPs
     alb.ingress.kubernetes.io/healthcheck-path: /healthz # ruta para las verificaciones de salud
 spec:
