@@ -10,7 +10,8 @@ metadata:
 spec:
   ingressClassName: alb # especifica que este Ingress debe ser manejado por el controlador ALB
   rules:
-    - http:
+    - host: crud-backend.internal.crud-devops-pipeline.local # hostname que ExternalDNS va a registrar en Route53
+      http:
         paths:
           - path: / # cualquier ruta que comience con / será dirigida al backend
             pathType: Prefix
