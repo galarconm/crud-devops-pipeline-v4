@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crud-devops-pipeline-nginx-001
+  namespace: sharedlbs
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: crud-devops-pipeline-nginx-001
+    alb.ingress.kubernetes.io/group.order: "1"
+spec:
+  ingressClassName: alb
+  rules:
+    - host: bootstrap-alb-nginx.internal.crud-devops-pipeline.local
+      http:
+        paths:
+          - path: /__bootstrap
+            pathType: Prefix
+            backend:
+              service:
+                name: dummy-service
+                port:
+                  number: 80

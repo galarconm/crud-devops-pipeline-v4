@@ -16,3 +16,7 @@ output "external_dns_zone_id" {
 output "external_dns_zone_name" {
   value = module.eks_addons.external_dns_zone_name
 }
+
+output "alb_logs_bucket" {
+  value = module.eks_addons.alb_logs_bucket
+}
