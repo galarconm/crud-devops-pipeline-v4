@@ -197,7 +197,7 @@ sed -e "s|\${ACM_CERT_ARN}|$ACM_CERT_ARN|g" -e "s|\${ALB_LOGS_BUCKET}|$ALB_LOGS_
 
 echo "Waiting for the shared ALB to provision..."
 for i in {1..30}; do
-  SHARED_ALB=$(kubectl get ingress crud-devops-pipeline-eksshared-001 -n sharedlbs -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  SHARED_ALB=$(kubectl get ingress crud-eksshared-001 -n sharedlbs -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
   if [ -n "$SHARED_ALB" ]; then
     echo "Shared ALB address: $SHARED_ALB"
     break

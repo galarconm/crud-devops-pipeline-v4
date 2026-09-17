@@ -6,7 +6,7 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/target-type: ip # el ALB enviará tráfico a los pods usando sus IPs
     alb.ingress.kubernetes.io/healthcheck-path: /healthz # ruta para las verificaciones de salud
-    alb.ingress.kubernetes.io/group.name: crud-devops-pipeline-eksshared-001 # se une al ALB compartido, no crea uno propio
+    alb.ingress.kubernetes.io/group.name: crud-eksshared-001 # se une al ALB compartido, no crea uno propio
     alb.ingress.kubernetes.io/group.order: "10" # se evalúa después del bootstrap ingress (order 1)
 spec:
   ingressClassName: alb # especifica que este Ingress debe ser manejado por el controlador ALB
