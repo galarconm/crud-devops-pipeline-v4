@@ -184,6 +184,28 @@ cd infra/environments/dev/addons && terraform destroy -auto-approve
 cd ../eks && terraform destroy -auto-approve
 cd ../tgw && terraform destroy -auto-approve
 cd ../data && terraform destroy -auto-approve
+```
+
+**Antes del `terraform destroy` de `networking`**, chequeá que no haya quedado ningún Security Group
+huérfano creado por el AWS Load Balancer Controller (no es Terraform-managed, así que si algo salió mal
+en el orden de limpieza puede sobrevivir a la destrucción del cluster y bloquear el `delete` de la VPC
+con `DependencyViolation` sin decir por qué):
+
+```bash
+VPC_ID=$(cd ../networking && terraform output -raw vpc_id 2>/dev/null)
+aws ec2 describe-security-groups --region us-east-1 --filters "Name=vpc-id,Values=$VPC_ID" --query "SecurityGroups[?GroupName!='default'].{Id:GroupId,Name:GroupName}" --output table
+```
+
+Si aparece algo (típicamente con nombre `k8s-traffic-...` o `eks-cluster-sg-...`), borralo a mano antes de
+seguir:
+
+```bash
+aws ec2 delete-security-group --region us-east-1 --group-id <ID>
+```
+
+Recién ahora:
+
+```bash
 cd ../networking && terraform destroy -auto-approve
 ```
 
@@ -244,3 +266,11 @@ Todos deben devolver vacío.
   que vaciarlo a mano una vez antes de agregar el fix). Es correcto para este bucket porque es
   infraestructura efímera que se destruye junto con el resto del stack, no un bucket pensado para retener
   logs a largo plazo.
+- **El AWS Load Balancer Controller crea Security Groups propios que Terraform no conoce ni gestiona**
+  (ej. `k8s-traffic-<cluster>-<hash>`, un SG "compartido" para tráfico ALB↔pods de versiones más nuevas
+  del LBC). Si el cluster EKS se destruye sin que el LBC tenga chance de limpiar sus propios recursos
+  primero, este SG queda huérfano en la VPC — y como no hay excepción en el mensaje de error, el
+  `terraform destroy` de `networking` falla con un genérico `DependencyViolation: The vpc ... has
+  dependencies` sin decir jamás cuál es la dependencia real. Hay que buscarlo a mano
+  (`aws ec2 describe-security-groups --filters Name=vpc-id,Values=<vpc-id>`) y borrarlo con
+  `aws ec2 delete-security-group` antes de reintentar. Ver el paso agregado en 2.3.
