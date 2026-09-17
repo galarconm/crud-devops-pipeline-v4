@@ -95,17 +95,19 @@ Es idempotente (usa `helm upgrade --install`) — si algo falla a mitad de camin
 correr el script completo sin problema. En orden, instala/crea:
 
 1. ArgoCD
-2. AWS Load Balancer Controller (con reinicio automático post-upgrade para el certificado del webhook)
-3. ExternalDNS
-4. cert-manager + un `ClusterIssuer` self-signed (no hay dominio público real para validar un challenge
+2. `metrics-server` (con `--kubelet-insecure-tls`, necesario en EKS) — sin esto, cualquier `HPA` se queda
+   con `TARGETS: <unknown>` y ArgoCD marca la app entera como `Degraded` aunque los pods estén sanos
+3. AWS Load Balancer Controller (con reinicio automático post-upgrade para el certificado del webhook)
+4. ExternalDNS
+5. cert-manager + un `ClusterIssuer` self-signed (no hay dominio público real para validar un challenge
    DNS-01 de Let's Encrypt contra la zona Route53 privada)
-5. El namespace `sharedlbs` + el **ALB compartido** (`crud-eksshared-001`): genera un
+6. El namespace `sharedlbs` + el **ALB compartido** (`crud-eksshared-001`): genera un
    certificado wildcard self-signed vía cert-manager, lo importa/actualiza en ACM, y aplica el Ingress
    bootstrap (`k8s/sharedlbs/ingress.yaml.tpl`) con ese cert + el bucket de logs
-6. Un segundo grupo de ALB **dedicado** (`crud-devops-pipeline-nginx-001`, solo HTTP, sin cert/logs) —
+7. Un segundo grupo de ALB **dedicado** (`crud-devops-pipeline-nginx-001`, solo HTTP, sin cert/logs) —
    demuestra el patrón alternativo del cluster de referencia (una app con su propio ALB, en vez de
    compartir el genérico)
-7. Los `Application` de ArgoCD (`k8s/argocd/*.yaml`) — `crud-backend` y `nginx-test` se despliegan desde
+8. Los `Application` de ArgoCD (`k8s/argocd/*.yaml`) — `crud-backend` y `nginx-test` se despliegan desde
    ahí, no por `kubectl apply` directo (GitOps puro, ver nota más abajo)
 
 ### 1.7 Verificar
@@ -217,3 +219,12 @@ Todos deben devolver vacío.
 - **Las apps (`crud-backend`, `nginx-test`) se despliegan solo vía ArgoCD**, nunca con `kubectl apply`
   directo desde `bootstrap.sh` — ese script está acotado a infraestructura de cluster que se crea una sola
   vez (controllers + el andamiaje de `sharedlbs`), consistente con el principio de GitOps puro del proyecto.
+- **Los nombres de ALB en AWS tienen un límite de 32 caracteres.** Si le ponés `load-balancer-name`
+  explícito a un Ingress bootstrap (como el del grupo compartido) y se pasa de 32, el LBC nunca va a poder
+  crear el balanceador — se queda con `FailedBuildModel: load balancer name cannot be longer than 32` para
+  siempre, sin que el `kubectl apply` en sí falle (el Ingress se crea bien, solo que el LBC no logra
+  aprovisionar nada). El grupo `nginx` no tiene este problema porque nunca le seteamos ese annotation
+  (AWS le generó un nombre corto automáticamente).
+- **Sin `metrics-server`, cualquier `HorizontalPodAutoscaler` se queda en `TARGETS: <unknown>`** y ArgoCD
+  marca la `Application` entera como `Degraded`, aunque los pods estén sanos y la app responda tráfico
+  real perfectamente. `bootstrap.sh` ya lo instala (con `--kubelet-insecure-tls`, necesario en EKS).
