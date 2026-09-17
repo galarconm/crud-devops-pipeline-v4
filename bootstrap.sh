@@ -49,6 +49,20 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 kubectl wait --for=condition=available --timeout=5m deployment/argocd-server -n argocd
 kubectl get pods -n argocd
 
+echo "Installing metrics-server..."
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# EKS kubelets serve their metrics endpoint with a self-signed certificate,
+# which metrics-server rejects by default - needs --kubelet-insecure-tls.
+# Guarded so re-running this script doesn't keep appending the flag.
+if ! kubectl get deployment metrics-server -n kube-system -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q "kubelet-insecure-tls"; then
+  kubectl patch deployment metrics-server -n kube-system --type=json \
+    -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+fi
+
+kubectl wait --for=condition=available --timeout=5m deployment/metrics-server -n kube-system
+kubectl get pods -n kube-system | grep metrics-server
+
 echo "Installing AWS Load Balancer Controller..."
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update
