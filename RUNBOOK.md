@@ -159,6 +159,17 @@ aws elbv2 describe-load-balancers --region us-east-1 --query "LoadBalancers[].Lo
 # debe devolver vacío antes de seguir
 ```
 
+**Ojo:** el Ingress bootstrap (`bootstrap-alb.internal.crud-devops-pipeline.local`) también tiene su propio
+registro DNS de ExternalDNS, no solo `crud-backend-ingress`. ExternalDNS tarda ~1 min en su ciclo de
+reconciliación en darse cuenta de que el Ingress desapareció y borrar el registro — si corrés el
+`terraform destroy` de `addons` demasiado rápido después de este paso, va a fallar con
+`HostedZoneNotEmpty`. Confirmá que la zona quedó con solo los registros `NS`/`SOA` por defecto antes de
+seguir:
+
+```bash
+aws route53 list-resource-record-sets --hosted-zone-id <ZONE_ID> --query "ResourceRecordSets[].{Name:Name,Type:Type}" --output table
+```
+
 (Opcional) El certificado importado a ACM no se borra solo — si querés limpiarlo:
 
 ```bash
@@ -228,3 +239,8 @@ Todos deben devolver vacío.
 - **Sin `metrics-server`, cualquier `HorizontalPodAutoscaler` se queda en `TARGETS: <unknown>`** y ArgoCD
   marca la `Application` entera como `Degraded`, aunque los pods estén sanos y la app responda tráfico
   real perfectamente. `bootstrap.sh` ya lo instala (con `--kubelet-insecure-tls`, necesario en EKS).
+- El bucket S3 de logs del ALB (`modules/eks-addons/alb-logs.tf`) tiene `force_destroy = true` — sin eso,
+  `terraform destroy` en `addons` falla con `BucketNotEmpty` apenas el ALB escribió algún log real (hubo
+  que vaciarlo a mano una vez antes de agregar el fix). Es correcto para este bucket porque es
+  infraestructura efímera que se destruye junto con el resto del stack, no un bucket pensado para retener
+  logs a largo plazo.
