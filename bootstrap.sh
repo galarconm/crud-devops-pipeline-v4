@@ -152,11 +152,11 @@ EOF
 kubectl get clusterissuer
 kubectl get pods -n cert-manager
 
-echo "Setting up shared ALB (sharedlbs namespace + bootstrap Ingress)..."
+echo "Setting up ALB for crud-backend (sharedlbs namespace + bootstrap Ingress)..."
 kubectl apply -f "$REPO_DIR/k8s/sharedlbs/namespace.yaml"
 kubectl apply -f "$REPO_DIR/k8s/sharedlbs/dummy-service.yaml"
 
-echo "Generating self-signed wildcard certificate for the shared ALB..."
+echo "Generating self-signed wildcard certificate for the ALB..."
 cat <<'EOF' | kubectl apply -f -
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -205,27 +205,19 @@ echo "ACM_CERT_ARN=$ACM_CERT_ARN"
 ALB_LOGS_BUCKET=$(cd "$REPO_DIR/infra/environments/dev/addons" && terraform init -input=false > /dev/null && terraform output -raw alb_logs_bucket)
 echo "ALB_LOGS_BUCKET=$ALB_LOGS_BUCKET"
 
-echo "Applying shared ALB bootstrap Ingress..."
+echo "Applying ALB bootstrap Ingress..."
 sed -e "s|\${ACM_CERT_ARN}|$ACM_CERT_ARN|g" -e "s|\${ALB_LOGS_BUCKET}|$ALB_LOGS_BUCKET|g" \
   "$REPO_DIR/k8s/sharedlbs/ingress.yaml.tpl" | kubectl apply -f -
 
-echo "Waiting for the shared ALB to provision..."
+echo "Waiting for the ALB to provision..."
 for i in {1..30}; do
-  SHARED_ALB=$(kubectl get ingress crud-eksshared-001 -n sharedlbs -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  SHARED_ALB=$(kubectl get ingress crud-backend-001 -n sharedlbs -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
   if [ -n "$SHARED_ALB" ]; then
-    echo "Shared ALB address: $SHARED_ALB"
+    echo "ALB address: $SHARED_ALB"
     break
   fi
   sleep 10
 done
-
-echo "Setting up a second, dedicated ALB group for the nginx test app..."
-kubectl apply -f "$REPO_DIR/k8s/sharedlbs/nginx-ingress.yaml"
-
-# The nginx test app itself (namespace, deployment, service, ingress) is NOT
-# applied here - it's a real application, so it's deployed via ArgoCD like
-# crud-backend, not kubectl-applied by this bootstrap script. See
-# k8s/argocd/application-nginx.yaml.
 
 echo "Applying ArgoCD application manifests..."
 kubectl apply -f "$REPO_DIR/k8s/argocd/"
@@ -242,19 +234,6 @@ done
 kubectl wait --for=condition=available --timeout=5m deployment/crud-backend-deployment -n dev
 kubectl get pods -n dev
 
-echo "Waiting for ArgoCD to create the pruebas-cni namespace..."
-for i in {1..30}; do
-  if kubectl get namespace pruebas-cni &> /dev/null; then
-    echo "Namespace pruebas-cni exists"
-    break
-  fi
-  sleep 10
-done
-
-kubectl wait --for=condition=available --timeout=5m deployment/nginx-test -n pruebas-cni
-kubectl get pods -n pruebas-cni
-
 echo "Verifying ArgoCD syncs..."
 kubectl get applications -n argocd
 kubectl get pods -n dev
-kubectl get pods -n pruebas-cni

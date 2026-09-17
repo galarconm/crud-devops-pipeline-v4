@@ -82,7 +82,7 @@ terraform apply -auto-approve
 aws eks list-addons --cluster-name crud-devops-pipeline-dev --region us-east-1   # los 4 deben quedar ACTIVE
 ```
 
-Esto también crea el bucket S3 para los access logs del ALB compartido (`modules/eks-addons/alb-logs.tf`).
+Esto también crea el bucket S3 para los access logs del ALB (`modules/eks-addons/alb-logs.tf`).
 
 ### 1.6 Bootstrap completo (desde la CloudShell)
 
@@ -101,63 +101,58 @@ correr el script completo sin problema. En orden, instala/crea:
 4. ExternalDNS
 5. cert-manager + un `ClusterIssuer` self-signed (no hay dominio público real para validar un challenge
    DNS-01 de Let's Encrypt contra la zona Route53 privada)
-6. El namespace `sharedlbs` + el **ALB compartido** (`crud-eksshared-001`): genera un
+6. El namespace `sharedlbs` + el **ALB dedicado a `crud-backend`** (`crud-backend-001`): genera un
    certificado wildcard self-signed vía cert-manager, lo importa/actualiza en ACM, y aplica el Ingress
    bootstrap (`k8s/sharedlbs/ingress.yaml.tpl`) con ese cert + el bucket de logs
-7. Un segundo grupo de ALB **dedicado** (`crud-devops-pipeline-nginx-001`, solo HTTP, sin cert/logs) —
-   demuestra el patrón alternativo del cluster de referencia (una app con su propio ALB, en vez de
-   compartir el genérico)
-8. Los `Application` de ArgoCD (`k8s/argocd/*.yaml`) — `crud-backend` y `nginx-test` se despliegan desde
-   ahí, no por `kubectl apply` directo (GitOps puro, ver nota más abajo)
+7. Los `Application` de ArgoCD (`k8s/argocd/*.yaml`) — `crud-backend` se despliega desde ahí, no por
+   `kubectl apply` directo (GitOps puro, ver nota más abajo)
 
 ### 1.7 Verificar
 
 ```bash
-kubectl get ingress --all-namespaces          # crud-backend-ingress y nginx-test-ingress deben tener ADDRESS
-kubectl get applications -n argocd            # crud-backend y nginx-test deben quedar Synced
-aws elbv2 describe-load-balancers --region us-east-1 --query "LoadBalancers[].{Name:LoadBalancerName,Scheme:Scheme}"  # deben aparecer 2 ALBs internal
+kubectl get ingress --all-namespaces          # crud-backend-ingress debe tener ADDRESS
+kubectl get applications -n argocd            # crud-backend debe quedar Synced
+aws elbv2 describe-load-balancers --region us-east-1 --query "LoadBalancers[].{Name:LoadBalancerName,Scheme:Scheme}"  # debe aparecer 1 ALB internal
 ```
 
 Probar el circuito completo (DNS + tráfico real), desde la CloudShell:
 
 ```bash
 curl http://crud-backend.internal.crud-devops-pipeline.local/healthz
-curl http://nginx.internal.crud-devops-pipeline.local/
 ```
 
 ## 2. Destruir
 
-**No lo hagas al revés de esto.** Los 2 ALBs, sus certificados en ACM, y los registros DNS los crean los
+**No lo hagas al revés de esto.** El ALB, su certificado en ACM, y el registro DNS los crean los
 controllers (LBC/ExternalDNS/cert-manager) directamente en AWS, **no Terraform**. Si destruís el cluster
-sin borrarlos primero: los ALBs quedan huérfanos en AWS (siguen facturando, invisibles para Terraform), y
+sin borrarlos primero: el ALB queda huérfano en AWS (sigue facturando, invisible para Terraform), y
 el `terraform destroy` de `addons` puede fallar porque AWS no deja borrar una hosted zone de Route53 que
 todavía tiene registros adentro.
 
-### 2.1 Limpiar las apps (desde la CloudShell, con el cluster vivo)
+### 2.1 Limpiar la app (desde la CloudShell, con el cluster vivo)
 
-**No borres los `Ingress` directamente** — los `Application` de ArgoCD tienen `selfHeal: true`, así que en
-cuanto los borrás, ArgoCD ve que "falta" (sigue existiendo en git) y los vuelve a crear. Hay que borrar el
+**No borres el `Ingress` directamente** — el `Application` de ArgoCD tiene `selfHeal: true`, así que en
+cuanto lo borrás, ArgoCD ve que "falta" (sigue existiendo en git) y lo vuelve a crear. Hay que borrar el
 `Application` en sí, que tiene el finalizer `resources-finalizer.argocd.argoproj.io`: eso hace que ArgoCD
 borre en cascada todo lo que gestiona (Ingress incluido) antes de terminar de borrarse a sí mismo.
 
 ```bash
 kubectl delete application crud-backend -n argocd
-kubectl delete application nginx-test -n argocd
 ```
 
-Esto borra las reglas de cada app dentro de su grupo de ALB — pero **no borra el ALB en sí todavía**,
-porque el Ingress bootstrap de cada grupo (en `sharedlbs`) sigue vivo. El LBC solo destruye el ALB físico
+Esto borra la regla de la app dentro de su grupo de ALB — pero **no borra el ALB en sí todavía**,
+porque el Ingress bootstrap del grupo (en `sharedlbs`) sigue vivo. El LBC solo destruye el ALB físico
 cuando el **último** Ingress de ese grupo desaparece.
 
-### 2.2 Limpiar el andamiaje de los ALB compartidos
+### 2.2 Limpiar el andamiaje del ALB
 
 ```bash
 kubectl delete namespace sharedlbs
 ```
 
-Esto borra los 2 Ingress bootstrap (`crud-eksshared-001` y `crud-devops-pipeline-nginx-001`)
-y con ellos, los 2 ALBs reales en AWS. Como con los `delete` anteriores, puede tardar 1-3 min — es seguro
-cortarlo con `Ctrl+C`, la limpieza del lado de AWS sigue corriendo igual. Confirmá que terminó:
+Esto borra el Ingress bootstrap (`crud-backend-001`) y con él, el ALB real en AWS. Como con los `delete`
+anteriores, puede tardar 1-3 min — es seguro cortarlo con `Ctrl+C`, la limpieza del lado de AWS sigue
+corriendo igual. Confirmá que terminó:
 
 ```bash
 aws elbv2 describe-load-balancers --region us-east-1 --query "LoadBalancers[].LoadBalancerName" --output text
@@ -207,24 +202,29 @@ Todos deben devolver vacío.
   cada `helm upgrade` sin reiniciar los pods necesariamente — `bootstrap.sh` ya incluye un
   `kubectl rollout restart` automático después de instalarlo/actualizarlo para evitar que esto rompa la
   creación de cualquier Service/Pod nuevo en el cluster.
-- **Patrón de ALB compartido (IngressGroup):** ningún Ingress de app real (`k8s/base/ingress.yaml`,
-  `k8s/pruebas-cni/ingress.yaml`) define su propio ALB — solo llevan `group.name`/`group.order` +
-  `target-type`/`healthcheck-path` (config por target-group) + sus reglas de `host`/`path`. Todo lo que
-  define el ALB en sí (`scheme`, `listen-ports`, `certificate-arn`, `ssl-policy`, `load-balancer-name`,
-  `load-balancer-attributes`) vive **solo** en el Ingress bootstrap del grupo, en `sharedlbs`. Si agregás
-  una app nueva: sumala al grupo compartido (mismo `group.name` que `crud-backend`) si puede compartir
-  ALB, o armale su propio par bootstrap+grupo dedicado (como `nginx`/`crud-devops-pipeline-nginx-001`) si
-  necesita configuración propia (certificado distinto, logs separados, etc.) — igual que hace el cluster
-  de referencia con apps como mulesoft.
-- **Las apps (`crud-backend`, `nginx-test`) se despliegan solo vía ArgoCD**, nunca con `kubectl apply`
-  directo desde `bootstrap.sh` — ese script está acotado a infraestructura de cluster que se crea una sola
-  vez (controllers + el andamiaje de `sharedlbs`), consistente con el principio de GitOps puro del proyecto.
+- **Patrón de ALB dedicado (IngressGroup):** `k8s/base/ingress.yaml` no define su propio ALB — solo lleva
+  `group.name`/`group.order` + `target-type`/`healthcheck-path` (config por target-group) + sus reglas de
+  `host`/`path`. Todo lo que define el ALB en sí (`scheme`, `listen-ports`, `certificate-arn`, `ssl-policy`,
+  `load-balancer-name`, `load-balancer-attributes`) vive **solo** en el Ingress bootstrap del grupo, en
+  `sharedlbs` (`crud-backend-001`). Este es el mismo patrón que usa el cluster de referencia: un ALB
+  dedicado por app real (ej. `mulesoft-001`), no uno genérico compartido entre varias — si agregás una
+  segunda app real algún día, armale su propio par bootstrap+grupo dedicado, no la sumes a este.
+- **`crud-backend` se despliega solo vía ArgoCD**, nunca con `kubectl apply` directo desde `bootstrap.sh`
+  — ese script está acotado a infraestructura de cluster que se crea una sola vez (controllers + el
+  andamiaje de `sharedlbs`), consistente con el principio de GitOps puro del proyecto.
+- **Se probó y descartó una segunda app de prueba (nginx) con su propio ALB dedicado**, para validar que
+  el patrón de "grupo dedicado por app" funcionaba (funcionó). Se sacó después, al confirmar (revisando
+  `kubectl get deploy/svc/ingress` en el cluster de referencia) que el cluster real que se está replicando
+  (mulesoft) solo tiene **una** app con **un** ALB dedicado — su app de prueba (nginx, corriendo bajo el
+  nombre `mulesoft-test`) fue reemplazada por la app real en el mismo grupo, no conviven las dos. Si en
+  algún momento se quiere demostrar el patrón "grupo compartido entre varias apps" (el otro patrón real,
+  usado en el cluster de pruebas genérico con `eksshared-001`), es un caso aparte — no es lo que tiene el
+  cluster de mulesoft específicamente.
 - **Los nombres de ALB en AWS tienen un límite de 32 caracteres.** Si le ponés `load-balancer-name`
-  explícito a un Ingress bootstrap (como el del grupo compartido) y se pasa de 32, el LBC nunca va a poder
-  crear el balanceador — se queda con `FailedBuildModel: load balancer name cannot be longer than 32` para
-  siempre, sin que el `kubectl apply` en sí falle (el Ingress se crea bien, solo que el LBC no logra
-  aprovisionar nada). El grupo `nginx` no tiene este problema porque nunca le seteamos ese annotation
-  (AWS le generó un nombre corto automáticamente).
+  explícito a un Ingress bootstrap y se pasa de 32, el LBC nunca va a poder crear el balanceador — se
+  queda con `FailedBuildModel: load balancer name cannot be longer than 32` para siempre, sin que el
+  `kubectl apply` en sí falle (el Ingress se crea bien, solo que el LBC no logra aprovisionar nada). Por
+  eso el grupo se llama `crud-backend-001` y no algo más largo/descriptivo.
 - **Sin `metrics-server`, cualquier `HorizontalPodAutoscaler` se queda en `TARGETS: <unknown>`** y ArgoCD
   marca la `Application` entera como `Degraded`, aunque los pods estén sanos y la app responda tráfico
   real perfectamente. `bootstrap.sh` ya lo instala (con `--kubelet-insecure-tls`, necesario en EKS).
