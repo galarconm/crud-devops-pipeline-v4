@@ -205,8 +205,13 @@ echo "ACM_CERT_ARN=$ACM_CERT_ARN"
 ALB_LOGS_BUCKET=$(cd "$REPO_DIR/infra/environments/dev/addons" && terraform init -input=false > /dev/null && terraform output -raw alb_logs_bucket)
 echo "ALB_LOGS_BUCKET=$ALB_LOGS_BUCKET"
 
+# Explicit subnets instead of relying purely on the LBC's tag-based
+# auto-discovery - more robust, matches the reference cluster's own ingress.
+MIDDLEWARE_SUBNETS=$(cd "$REPO_DIR/infra/environments/dev/networking" && terraform init -input=false > /dev/null && terraform output -json middleware_subnet_ids | jq -r 'join(",")')
+echo "MIDDLEWARE_SUBNETS=$MIDDLEWARE_SUBNETS"
+
 echo "Applying ALB bootstrap Ingress..."
-sed -e "s|\${ACM_CERT_ARN}|$ACM_CERT_ARN|g" -e "s|\${ALB_LOGS_BUCKET}|$ALB_LOGS_BUCKET|g" \
+sed -e "s|\${ACM_CERT_ARN}|$ACM_CERT_ARN|g" -e "s|\${ALB_LOGS_BUCKET}|$ALB_LOGS_BUCKET|g" -e "s|\${MIDDLEWARE_SUBNETS}|$MIDDLEWARE_SUBNETS|g" \
   "$REPO_DIR/k8s/sharedlbs/ingress.yaml.tpl" | kubectl apply -f -
 
 echo "Waiting for the ALB to provision..."
